@@ -83,15 +83,83 @@ class Trainer(object):
 
         return train_loader, val_loader
 
+    def training_step(self,
+                      imgs: torch.Tensor,
+                      masks: torch.Tensor,
+                      class_weights: torch.Tensor,
+                      running_loss: float):
+        t_data_start = perf_counter()
+        imgs = imgs.to(self.model.device, non_blocking=True)
+        masks = masks.to(self.model.device, non_blocking=True)
+        t_fwd_start = perf_counter()
+        self.opt.zero_grad(set_to_none=True)
+        logits = self.model(imgs)
+        t_loss_start = perf_counter()
+        loss = F.cross_entropy(logits,
+                               masks,
+                               weight=class_weights,
+                               ignore_index=-1)
+        t_bwd_start = perf_counter()
+        loss.backward()
+        t_step_start = perf_counter()
+        self.opt.step()
+        running_loss += float(loss.item())
+        t_metrics_start = perf_counter()
+        self.meter_train.update(logits.detach(), masks.detach())
+        t_end = perf_counter()
+
+        batch_time_metrics = TimeMetrics(
+            data=t_fwd_start - t_data_start,
+            forward=t_loss_start - t_fwd_start,
+            backward=t_bwd_start - t_loss_start,
+            optimizer_step=t_step_start - t_bwd_start,
+            metrics=t_end - t_metrics_start,
+            batch=t_end - t_data_start
+        )
+        return batch_time_metrics, loss, logits, masks, running_loss
+
+    def val_step(
+            self,
+            imgs: torch.Tensor,
+            masks: torch.Tensor,
+            class_weights: torch.Tensor,
+            val_loss: float,
+            val_time_metrics: TimeMetrics
+    ):
+        t_batch_start = t_data_start = perf_counter()
+        imgs = imgs.to(self.model.device, non_blocking=True)
+        masks = masks.to(self.model.device, non_blocking=True)
+        t_fwd_start = perf_counter()
+        logits = self.model(imgs)
+        t_loss_start = perf_counter()
+        _val_loss = F.cross_entropy(logits,
+                                    masks,
+                                    weight=class_weights,
+                                    ignore_index=-1)
+        val_loss += float(_val_loss.item())
+        t_metrics_start = perf_counter()
+        self.meter_val.update(logits, masks)
+        t_batch_end = perf_counter()
+
+        val_time_metrics += TimeMetrics(
+            total=t_batch_end - t_batch_start,
+            data=t_fwd_start - t_data_start,
+            forward=t_loss_start - t_fwd_start,
+            optimizer_step=t_metrics_start - t_loss_start,
+            batch=t_batch_end - t_batch_start,
+            metrics=t_batch_end - t_metrics_start
+        )
+        return val_loss, val_time_metrics
+
     def train(self):
 
         global_step: int = 0
-        step_in_epoch: int = 0
         class_weights: torch.Tensor = torch.tensor(
             self.cfg.class_weights,
             dtype=torch.float32,
             device=self.model.device
         )
+        step_in_epoch: int
         train_time_metrics: TimeMetrics
         val_time_metrics: TimeMetrics
         loss: torch.Tensor
@@ -103,114 +171,76 @@ class Trainer(object):
             self.model.train()
             self.meter_train.reset()
             running_loss = 0.0
+            step_in_epoch = 0
             train_time_metrics = TimeMetrics()
-            for step_in_epoch, (imgs, masks) in tqdm(enumerate(self.train_loader),
-                                                     desc=f"Epoch {epoch+1}/{self.cfg.num_epochs} [train]"):
-                t_batch_start = t_data_start = perf_counter()
+            for imgs, masks in tqdm(self.train_loader,
+                                    desc=f"Epoch {epoch+1}/{self.cfg.num_epochs} [train]"):
 
-                imgs = imgs.to(self.model.device, non_blocking=True)
-                masks = masks.to(self.model.device, non_blocking=True)
-
-                t_fwd_start = perf_counter()
-                self.opt.zero_grad(set_to_none=True)
-                logits = self.model(imgs)
-                t_loss_start = perf_counter()
-                loss = F.cross_entropy(logits,
-                                       masks,
-                                       weight=class_weights,
-                                       ignore_index=-1)
-                t_bwd_start = perf_counter()
-                loss.backward()
-                t_step_start = perf_counter()
-                self.opt.step()
-
-                running_loss += float(loss.item())
-                t_metrics_start = perf_counter()
-                self.meter_train.update(logits.detach(), masks.detach())
-
-                self.tb_train.log_loss(float(loss.item()), global_step)
-                t_batch_end = perf_counter()
+                batch_time_metrics, loss, logits, masks, running_loss = \
+                    self.training_step(
+                        imgs=imgs,
+                        masks=masks,
+                        class_weights=class_weights,
+                        running_loss=running_loss
+                    )
+                step_in_epoch += 1
                 global_step += 1
 
-                batch_time_metrics = TimeMetrics(
-                    total=t_batch_end - t_batch_start,
-                    data=t_fwd_start - t_data_start,
-                    forward=t_loss_start - t_fwd_start,
-                    backward=t_bwd_start - t_loss_start,
-                    step=t_step_start - t_bwd_start,
-                    batch=t_batch_end - t_batch_start,
-                    metrics=t_metrics_start - t_step_start
-                )
+                # Log results
                 train_time_metrics += batch_time_metrics
+                self.tb_train.log_loss(float(loss.item()), global_step)
+                if global_step % self.cfg.train_logging_freq == 0:
+                    train_time_metrics /= (step_in_epoch + 1)
+                    train_metrics = self.meter_train.compute()
 
-                # if global_step > 3:
-                #     break
 
-            if global_step % self.cfg.train_logging_freq == 0:
-                train_time_metrics /= (step_in_epoch + 1)
-                train_metrics = self.meter_train.compute()
+                    self.logger.info(
+                        f'Training step {global_step} - '
+                        f'Avg loss (s) - {running_loss / max(1, len(self.train_loader)):.4f} '
+                        f'Avg result (s) - {train_metrics.macro} '
+                        f'Avg times (s) - {train_time_metrics}'
+                    )
 
-                # Log results
-                self.logger.info(f'Val Epoch {epoch + 1}/{self.cfg.num_epochs} - '
-                                 f'Avg loss (s) - {running_loss / max(1, len(self.train_loader)):.4f} '
-                                 f'Avg result (s) - {train_metrics.macro} '
-                                 f'Avg times (s) - {train_time_metrics}')
+                    self.tb_train.log_metrics(train_metrics, step=global_step)
+                    self.tb_train.flush()
 
-                self.tb_train.log_metrics(train_metrics, step=global_step)
-                self.tb_train.flush()
+                # ---- validation ----
+                if global_step % self.cfg.val_logging_freq == 0:
+                    self.model.eval()
+                    self.meter_val.reset()
 
-            # ---- validation ----
-            if global_step % self.cfg.val_logging_freq == 0:
-                self.model.eval()
-                self.meter_val.reset()
+                    val_loss = 0.0
+                    val_step = 0
 
-                val_loss = 0.0
-                val_step = 0
+                    with torch.no_grad():
+                        val_time_metrics = TimeMetrics()
+                        for imgs, masks in tqdm(self.val_loader,
+                                                desc=f"Epoch {epoch+1}/{self.cfg.num_epochs} [val]"):
 
-                with torch.no_grad():
-                    val_time_metrics = TimeMetrics()
-                    for imgs, masks in tqdm(self.val_loader,
-                                            desc=f"Epoch {epoch+1}/{self.cfg.num_epochs} [val]"):
-                        t_batch_start = t_data_start = perf_counter()
-                        imgs = imgs.to(self.model.device, non_blocking=True)
-                        masks = masks.to(self.model.device, non_blocking=True)
-                        t_fwd_start = perf_counter()
-                        logits = self.model(imgs)
-                        t_loss_start = perf_counter()
-                        _val_loss = F.cross_entropy(logits,
-                                                    masks,
-                                                    weight=class_weights,
-                                                    ignore_index=-1)
-                        val_loss += float(_val_loss.item())
-                        t_metrics_start = perf_counter()
-                        self.meter_val.update(logits, masks)
-                        t_batch_end = perf_counter()
+                            val_loss, val_time_metrics = self.val_step(
+                                imgs=imgs,
+                                masks=masks,
+                                class_weights=class_weights,
+                                val_loss=val_loss,
+                                val_time_metrics=val_time_metrics
+                            )
 
-                        val_time_metrics += TimeMetrics(
-                            total=t_batch_end - t_batch_start,
-                            data=t_fwd_start - t_data_start,
-                            forward=t_loss_start - t_fwd_start,
-                            step=t_metrics_start - t_loss_start,
-                            batch=t_batch_end - t_batch_start,
-                            metrics=t_batch_end - t_metrics_start
-                        )
+                            val_step += 1
 
-                        val_step += 1
+                    val_time_metrics /= val_step + 1
+                    val_metrics = self.meter_val.compute()
+                    avg_val_loss = val_loss / max(1, len(self.val_loader))
+                    # Log results
+                    self.logger.info(f'Val for Step {epoch + 1} - '
+                                     f'Avg loss - {avg_val_loss:.4f} '
+                                     f'Avg result - {val_metrics.macro} '
+                                     f'Avg times - {val_time_metrics}')
+                    self.tb_val.log_loss(avg_val_loss, epoch)
+                    self.tb_val.log_metrics(val_metrics, step=global_step)
+                    self.tb_val.flush()
 
-                val_time_metrics /= val_step + 1
-                val_metrics = self.meter_val.compute()
-                avg_val_loss = val_loss / max(1, len(self.val_loader))
-                # Log results
-                self.logger.info(f'Val Epoch {epoch + 1}/{self.cfg.num_epochs} - '
-                                 f'Avg loss - {avg_val_loss:.4f} '
-                                 f'Avg result - {val_metrics.macro} '
-                                 f'Avg times - {val_time_metrics}')
-                self.tb_val.log_loss(avg_val_loss, epoch)
-                self.tb_val.log_metrics(val_metrics, step=global_step)
-                self.tb_val.flush()
-
-            # ---- checkpoint ----
-            torch.save(self.model.state_dict(), os.path.join(self.weights_path, f"{epoch}.pth"))
+                    # ---- checkpoint ----
+                    torch.save(self.model.state_dict(), os.path.join(self.weights_path, f"{epoch}.pth"))
 
 if __name__ == "__main__":
     trainer = Trainer()

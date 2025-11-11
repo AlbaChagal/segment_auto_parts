@@ -10,7 +10,7 @@ from logger import Logger
 from preprocessors import ImagePreprocessor
 
 
-class Inference_manager(object):
+class InferenceManager(object):
     def __init__(self, config: Config,
                  input_dir: str,
                  output_dir: str,
@@ -66,8 +66,8 @@ if __name__ == "__main__":
     args = p.parse_args()
     model_path_main = 'outputs/20251111_150841/weights/11.pth'
     config = Config()
-    inference_manager = Inference_manager(config=config,
-                                          input_dir=args.input,
-                                          output_dir=args.output,
-                                          model_path=model_path_main)
+    inference_manager = InferenceManager(config=config,
+                                         input_dir=args.input,
+                                         output_dir=args.output,
+                                         model_path=model_path_main)
     inference_manager.run_inference()

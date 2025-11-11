@@ -4,6 +4,9 @@ from typing import List
 
 @dataclass
 class PerClassMetrics:
+    """
+    A dataclass to hold per-class segmentation metrics.
+    """
     precision: List[float]
     recall: List[float]
     iou: List[float]
@@ -12,6 +15,9 @@ class PerClassMetrics:
 
 @dataclass
 class MacroMetrics:
+    """
+    A dataclass to hold macro-averaged segmentation metrics.
+    """
     precision: float
     recall: float
     iou: float
@@ -25,16 +31,22 @@ class MacroMetrics:
 
 @dataclass
 class SegmentationMetrics:
+    """
+    A dataclass to hold segmentation metrics.
+    """
     per_class: PerClassMetrics
     macro: MacroMetrics
 
 @dataclass
 class TimeMetrics:
+    """
+    A dataclass to hold time metrics for various stages of training.
+    """
     total: float = 0.0
     data: float = 0.0
     forward: float = 0.0
     backward: float = 0.0
-    step: float = 0.0
+    optimizer_step: float = 0.0
     batch: float = 0.0
     metrics: float = 0.0
 
@@ -44,7 +56,7 @@ class TimeMetrics:
             data=self.data + other.data,
             forward=self.forward + other.forward,
             backward=self.backward + other.backward,
-            step=self.step + other.step,
+            optimizer_step=self.optimizer_step + other.optimizer_step,
             batch=self.batch + other.batch,
             metrics=self.metrics + other.metrics,
         )
@@ -55,12 +67,12 @@ class TimeMetrics:
             data=self.data / scalar,
             forward=self.forward / scalar,
             backward=self.backward / scalar,
-            step=self.step / scalar,
+            optimizer_step=self.optimizer_step / scalar,
             batch=self.batch / scalar,
             metrics=self.metrics / scalar,
         )
 
     def __str__(self):
         return f'total: {self.total: .4f}, data: {self.data:.4f}, ' \
-        f'forward: {self.forward:.4f}, step: {self.step:.4f}, ' \
+        f'forward: {self.forward:.4f}, step: {self.optimizer_step:.4f}, ' \
         f'batch: {self.batch:.4f}, metrics: {self.metrics:.4f}'

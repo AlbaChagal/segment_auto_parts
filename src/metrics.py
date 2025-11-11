@@ -38,12 +38,14 @@ class StreamingSegMetrics:
 
         self.logger.debug(f'update - updating confusion matrix with preds shape {preds.shape} '
                          f'and targets shape {targets.shape}')
+        preds: torch.Tensor
         if preds.dim() == 4:
             preds = preds.argmax(1)
         preds = preds.reshape(-1).to(torch.int64, non_blocking=False).cpu()
-        targets = targets.reshape(-1).to(torch.int64, non_blocking=False).cpu()
+        targets: torch.Tensor = (
+            targets.reshape(-1).to(torch.int64, non_blocking=False).cpu())
 
-        keep = (targets >= 0) & (targets < self.num_classes)
+        keep: torch.Tensor = (targets >= 0) & (targets < self.num_classes)
         preds = preds[keep].clamp_(0, self.num_classes - 1)
         targets = targets[keep]
 
@@ -60,6 +62,10 @@ class StreamingSegMetrics:
 
     @torch.no_grad()
     def compute(self) -> SegmentationMetrics:
+        """
+        Computes segmentation metrics from the accumulated confusion matrix.
+        :return: SegmentationMetrics dataclass with per-class and macro metrics.
+        """
         self.logger.debug(f'compute - computing segmentation metrics from confusion matrix')
         cm: torch.Tensor = self.confusion_matrix.to(torch.float32)
         tp: torch.Tensor = cm.diag()
