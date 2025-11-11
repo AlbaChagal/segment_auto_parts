@@ -3,7 +3,6 @@ import torch
 from config import Config
 from data_structures import PerClassMetrics, MacroMetrics, SegmentationMetrics
 from logger import Logger
-from model import SegModel
 
 
 class StreamingSegMetrics:
@@ -20,6 +19,14 @@ class StreamingSegMetrics:
         self.ignore_index: int = ignore_index
         self.confusion_matrix: torch.Tensor = torch.zeros((self.num_classes, self.num_classes),
                                                           dtype=torch.long).to(self.device)
+
+    @torch.no_grad()
+    def reset(self):
+        """
+        Resets the confusion matrix to zero.
+        """
+        self.logger.debug(f'reset - resetting confusion matrix')
+        self.confusion_matrix.zero_()
 
     @torch.no_grad()
     def update(self, preds: torch.Tensor, targets: torch.Tensor):

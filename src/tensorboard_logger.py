@@ -7,7 +7,7 @@ from config import Config
 from logger import Logger
 
 
-class TensorBoardLogger:
+class TensorBoardLogger(object):
     """
     Independent writer per split (e.g., 'train', 'val').
     Logs:

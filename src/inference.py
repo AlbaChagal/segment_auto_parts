@@ -4,7 +4,7 @@ import torchvision.transforms as T
 from model import SegModel
 from config import Config
 
-def run_inference(input_dir, output_dir):
+def run_inference(input_dir: str, output_dir: str):
     cfg = Config()
     os.makedirs(output_dir, exist_ok=True)
     model = SegModel(config=cfg)
