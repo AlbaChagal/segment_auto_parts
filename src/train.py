@@ -54,6 +54,7 @@ class Trainer(object):
     @staticmethod
     def make_loaders(cfg: Config) -> Tuple[DataLoader, DataLoader]:
         dataset: CarPartsDataset = CarPartsDataset(
+            config=cfg,
             images_dir=os.path.join(cfg.data_dir, "images"),
             masks_dir=os.path.join(cfg.data_dir, "masks"),
             size=cfg.image_size,
@@ -106,6 +107,7 @@ class Trainer(object):
             for step_in_epoch, (imgs, masks) in tqdm(enumerate(self.train_loader),
                                                      desc=f"Epoch {epoch+1}/{self.cfg.num_epochs} [train]"):
                 t_batch_start = t_data_start = perf_counter()
+
                 imgs = imgs.to(self.model.device, non_blocking=True)
                 masks = masks.to(self.model.device, non_blocking=True)
 

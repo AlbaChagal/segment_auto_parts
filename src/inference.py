@@ -7,6 +7,7 @@ import torchvision.transforms as T
 from model import SegModel
 from config import Config
 from logger import Logger
+from preprocessors import ImagePreprocessor
 
 
 class Inference_manager(object):
@@ -23,33 +24,37 @@ class Inference_manager(object):
         self.logger = Logger(name=self.__class__.__name__,
                              logging_level=debug_level)
 
-    def run_inference(self):
-
         os.makedirs(self.output_dir, exist_ok=True)
-        model = SegModel(config=self.config)
-        model.load_state_dict(torch.load(self.model_path, map_location="cpu"))
-        model.eval().to(model.device)
-        transform = T.Compose([
-            T.Resize(self.config.image_size), T.ToTensor(),
-            T.Normalize(mean=[0.485,0.456,0.406], std=[0.229,0.224,0.225])
-        ])
+
+        # Modules
+        self.preprocessor = ImagePreprocessor(config=self.config)
+        self.model = SegModel(config=self.config)
+        self.model.load_state_dict(torch.load(self.model_path, map_location="cpu"))
+        self.model.eval().to(self.model.device)
+
+    def run_inference(self):
         with torch.no_grad():
             for fname in os.listdir(self.input_dir):
                 t_load_data_start = perf_counter()
                 img = Image.open(os.path.join(self.input_dir, fname)).convert("RGB")
+                orig_shape = img.size
+
                 t_preprocess_start = perf_counter()
-                x = transform(img).unsqueeze(0).to(model.device)
-                t_infere_start = perf_counter()
-                pred = model(x).argmax(1) * 32.
+                x = self.preprocessor(img).unsqueeze(0).to(self.model.device)
+                t_infer_start = perf_counter()
+                pred = self.model(x).argmax(1).squeeze(0) * 32.
                 t_post_process_start = perf_counter()
-                pred = pred.squeeze(0).cpu().numpy().astype(np.uint8)
+                postprocess = T.Resize(orig_shape,
+                                       interpolation=T.InterpolationMode.NEAREST)
+                pred_full_size = postprocess(pred.unsqueeze(0).cpu())
+                pred_numpy = pred_full_size.numpy().astype(np.uint8)
                 t_main_end = perf_counter()
-                Image.fromarray(pred).save(os.path.join(self.output_dir, fname))
+                Image.fromarray(pred_numpy.squeeze()).save(os.path.join(self.output_dir, fname))
 
                 self.logger.info(f'Inference timings for {fname}: '
                                  f'load_data: {t_preprocess_start - t_load_data_start:.4f}, '
-                                 f'preprocess: {t_infere_start - t_preprocess_start:.4f}, '
-                                 f'inference: {t_post_process_start - t_infere_start:.4f}s, '
+                                 f'preprocess: {t_infer_start - t_preprocess_start:.4f}, '
+                                 f'inference: {t_post_process_start - t_infer_start:.4f}s, '
                                  f'postprocess: {t_main_end - t_post_process_start:.4f}s, '
                                  f'total: {t_main_end - t_load_data_start:.4f}s')
 

@@ -31,9 +31,10 @@ class Config:
                                              "front_fender": 96, "rear_fender": 128, "door_handle": 160}
 
     # Logging
-    model_logging_level = 'info'
+    model_logging_level = 'debug'
     trainer_logging_level = 'info'
     metrics_logging_level = 'info'
     tensorboard_logger_logging_level = 'info'
+    dataset_logging_level = 'info'
     train_logging_freq: int = 50
     val_logging_freq: int = 200
