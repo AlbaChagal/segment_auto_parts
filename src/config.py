@@ -11,6 +11,11 @@ class Config:
     val_batch_size: int = 1
     lr: float = 1e-4
     num_epochs: int = 30
+    # Class weights are computed using median frequency
+    # balancing with the script 'count_label_distribution.py'
+    class_weights: List[float] = \
+        [0.130084, 0.722525, 0.835331, 3.642700, 1.245533, 21.490470]
+
 
     # Path params
     outputs_folder_name: str = "outputs"
@@ -30,3 +35,5 @@ class Config:
     trainer_logging_level = 'info'
     metrics_logging_level = 'info'
     tensorboard_logger_logging_level = 'info'
+    train_logging_freq: int = 50
+    val_logging_freq: int = 200

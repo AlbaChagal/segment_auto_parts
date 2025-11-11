@@ -47,8 +47,9 @@ class TensorBoardLogger(object):
         self.logger.debug(f'log_metrics - logged metrics for step {step} on split {self.split}')
 
     def flush(self):
-        self.logger.info(f'flush - flushing TensorBoard writer for: {self.split}')
+        self.logger.debug(f'flush - flushing TensorBoard writer for: {self.split}')
         self.writer.flush()
 
     def close(self):
+        self.logger.debug(f'close - closing TensorBoard writer for: {self.split}')
         self.writer.close()
