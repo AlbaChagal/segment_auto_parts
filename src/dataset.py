@@ -1,5 +1,6 @@
 from typing import List, Tuple
 
+import torch
 from torch.utils.data import Dataset
 from PIL import Image
 import os
@@ -29,4 +30,15 @@ class CarPartsDataset(Dataset):
 
         img = self.transform_img(img)
         mask = self.transform_mask(mask).squeeze(0).long()
+
+        # remap raw pixel values -> contiguous class indices [0..5]
+        lut = torch.full((256,), -1, dtype=torch.long)
+        for idx, val in enumerate([0, 32, 64, 96, 128, 160]):
+            lut[val] = idx
+        mask = lut[mask]  # [H,W] in [0..5], -1 if unknown
+
+        # if any -1 slipped in, clamp to background (0) to keep CE happy; metrics will also guard
+        if (mask < 0).any():
+            mask = mask.clamp_min(0)
+
         return img, mask

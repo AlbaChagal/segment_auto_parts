@@ -11,7 +11,8 @@ class SegModel(nn.Module):
     def __init__(self, config: Config):
         super().__init__()
         self.config: Config = config
-        self.logger: Logger = Logger(self.__class__.__name__, logging_level=config.model_logging_level)
+        self.logger: Logger = Logger(self.__class__.__name__,
+                                     logging_level=config.model_logging_level)
         self.device: torch.device = self._get_device(self.logger)
         self.model = seg.deeplabv3_resnet50(pretrained=True)
         self.model.classifier[4] = nn.Conv2d(256, config.num_classes, kernel_size=1)

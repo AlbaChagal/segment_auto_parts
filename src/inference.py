@@ -8,7 +8,7 @@ def run_inference(input_dir, output_dir):
     cfg = Config()
     os.makedirs(output_dir, exist_ok=True)
     model = SegModel(config=cfg)
-    model.load_state_dict(torch.load(cfg.model_path, map_location="cpu"))
+    model.load_state_dict(torch.load(cfg.weight_folder_name, map_location="cpu"))
     model.eval().to(model.device)
     transform = T.Compose([
         T.Resize(cfg.image_size), T.ToTensor(),
