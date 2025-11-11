@@ -36,14 +36,20 @@ class TensorBoardLogger(object):
 
         # macro
         for k, v in macro.__dict__.items():
-            self.writer.add_scalar(f"_{self.split}/{k}", v, step)
+            self.logger.debug(f'log_metrics - logged macro {k} for step {step} on split {self.split}')
+            self.writer.add_scalar(f"_{self.split}/{k}", float(v), step)
 
         # per-class
         for i, name in enumerate(self.class_names):
-            self.writer.add_scalar(f"{self.split}_classes/{name}/precision", per_cls.precision[i], step)
-            self.writer.add_scalar(f"{self.split}_classes/{name}/recall",    per_cls.recall[i],    step)
-            self.writer.add_scalar(f"{self.split}_classes/{name}/iou",       per_cls.iou[i],       step)
-            self.writer.add_scalar(f"{self.split}_classes/{name}/dice",      per_cls.dice[i],      step)
+            self.logger.debug(f'log_metrics - logged {name} class metrics for step {step} on split {self.split}')
+            self.writer.add_scalar(f"{self.split}_classes/{name}/precision",
+                                   float(per_cls.precision[i]), step)
+            self.writer.add_scalar(f"{self.split}_classes/{name}/recall",
+                                   float(per_cls.recall[i]), step)
+            self.writer.add_scalar(f"{self.split}_classes/{name}/iou",
+                                   float(per_cls.iou[i]), step)
+            self.writer.add_scalar(f"{self.split}_classes/{name}/dice",
+                                   float(per_cls.dice[i]), step)
         self.logger.debug(f'log_metrics - logged metrics for step {step} on split {self.split}')
 
     def flush(self):
@@ -53,3 +59,12 @@ class TensorBoardLogger(object):
     def close(self):
         self.logger.debug(f'close - closing TensorBoard writer for: {self.split}')
         self.writer.close()
+
+
+if __name__ == "__main__":
+    from torch.utils.tensorboard import SummaryWriter
+    os.makedirs("outputs/test/tensorboard/test", exist_ok=True)
+    w = SummaryWriter("outputs/test/tensorboard/test")
+    w.add_scalar("test/x", 1.0, 0)
+    w.flush()
+    w.close()

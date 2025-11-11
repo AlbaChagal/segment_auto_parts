@@ -64,7 +64,7 @@ if __name__ == "__main__":
     p.add_argument("--input", required=True)
     p.add_argument("--output", required=True)
     args = p.parse_args()
-    model_path_main = 'outputs/20251111_150841/weights/11.pth'
+    model_path_main = '/Users/shaharheyman/PycharmProjects/auto1_segmentation/outputs/20251111_190327/'
     config = Config()
     inference_manager = InferenceManager(config=config,
                                          input_dir=args.input,

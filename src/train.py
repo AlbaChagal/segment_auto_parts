@@ -42,7 +42,7 @@ class Trainer(object):
         # Modules
         self.train_loader: DataLoader
         self.val_loader: DataLoader
-        self.train_loader, self.val_loader = self.make_loaders(self.cfg)
+        self.train_loader, self.val_loader = self.make_loaders()
         self.model: SegModel = SegModel(self.cfg)
         self.model.to(self.model.device)
         self.opt: torch.optim.AdamW = torch.optim.AdamW(self.model.parameters(),
@@ -51,35 +51,38 @@ class Trainer(object):
         self.meter_val: StreamingSegMetrics = StreamingSegMetrics(self.cfg)
         self.logger.info(f'initialized with model ID: {self.model_id}')
 
-    @staticmethod
-    def make_loaders(cfg: Config) -> Tuple[DataLoader, DataLoader]:
+    def make_loaders(self) -> Tuple[DataLoader, DataLoader]:
         dataset: CarPartsDataset = CarPartsDataset(
-            config=cfg,
-            images_dir=os.path.join(cfg.data_dir, "images"),
-            masks_dir=os.path.join(cfg.data_dir, "masks"),
-            size=cfg.image_size,
+            config=self.cfg,
+            images_dir=os.path.join(self.cfg.data_dir, "images"),
+            masks_dir=os.path.join(self.cfg.data_dir, "masks"),
+            size=self.cfg.image_size,
             augment=False,
         )
-        n_val: int = max(1, int(cfg.val_percentage * len(dataset)))
+        n_val: int = max(1, int(self.cfg.val_percentage * len(dataset)))
         n_train: int = len(dataset) - n_val
 
         train_dataset: CarPartsDataset
         val_dataset: CarPartsDataset
         train_dataset, val_dataset = random_split(dataset,
                                         lengths=[n_train, n_val],
-                                        generator=torch.Generator().manual_seed(cfg.random_seed))
+                                        generator=torch.Generator().manual_seed(self.cfg.random_seed))
 
         train_loader: DataLoader = DataLoader(train_dataset,
-                                              batch_size=cfg.batch_size,
+                                              batch_size=self.cfg.batch_size,
                                               shuffle=True,
                                               num_workers=4,
                                               pin_memory=True)
 
         val_loader: DataLoader   = DataLoader(val_dataset,
-                                              batch_size=cfg.val_batch_size,
+                                              batch_size=self.cfg.val_batch_size,
                                               shuffle=False,
                                               num_workers=1,
                                               pin_memory=True)
+        self.logger.info(
+            f'Created data loaders - train samples: {n_train}, val samples: {n_val}, '
+            f'train batches: {len(train_loader)}, val batches: {len(val_loader)}'
+        )
 
         return train_loader, val_loader
 
@@ -114,7 +117,8 @@ class Trainer(object):
             backward=t_bwd_start - t_loss_start,
             optimizer_step=t_step_start - t_bwd_start,
             metrics=t_end - t_metrics_start,
-            batch=t_end - t_data_start
+            batch=t_end - t_data_start,
+            total=t_end - t_data_start
         )
         return batch_time_metrics, loss, logits, masks, running_loss
 
@@ -173,8 +177,8 @@ class Trainer(object):
             running_loss = 0.0
             step_in_epoch = 0
             train_time_metrics = TimeMetrics()
-            for imgs, masks in tqdm(self.train_loader,
-                                    desc=f"Epoch {epoch+1}/{self.cfg.num_epochs} [train]"):
+            self.logger.info(f'New epoch {epoch + 1}/{self.cfg.num_epochs} at global step {global_step}')
+            for imgs, masks in self.train_loader:
 
                 batch_time_metrics, loss, logits, masks, running_loss = \
                     self.training_step(
@@ -185,11 +189,13 @@ class Trainer(object):
                     )
                 step_in_epoch += 1
                 global_step += 1
+                self.logger.info(f'Global step: {global_step}, Loss: {loss.item():.4f}')
 
                 # Log results
                 train_time_metrics += batch_time_metrics
                 self.tb_train.log_loss(float(loss.item()), global_step)
                 if global_step % self.cfg.train_logging_freq == 0:
+                    self.logger.info(f'Logging training metrics at step {global_step}')
                     train_time_metrics /= (step_in_epoch + 1)
                     train_metrics = self.meter_train.compute()
 
@@ -206,6 +212,7 @@ class Trainer(object):
 
                 # ---- validation ----
                 if global_step % self.cfg.val_logging_freq == 0:
+                    self.logger.info(f'Starting validation at step {global_step}')
                     self.model.eval()
                     self.meter_val.reset()
 
@@ -214,9 +221,7 @@ class Trainer(object):
 
                     with torch.no_grad():
                         val_time_metrics = TimeMetrics()
-                        for imgs, masks in tqdm(self.val_loader,
-                                                desc=f"Epoch {epoch+1}/{self.cfg.num_epochs} [val]"):
-
+                        for imgs, masks in self.val_loader:
                             val_loss, val_time_metrics = self.val_step(
                                 imgs=imgs,
                                 masks=masks,
@@ -227,20 +232,25 @@ class Trainer(object):
 
                             val_step += 1
 
-                    val_time_metrics /= val_step + 1
-                    val_metrics = self.meter_val.compute()
-                    avg_val_loss = val_loss / max(1, len(self.val_loader))
-                    # Log results
-                    self.logger.info(f'Val for Step {epoch + 1} - '
-                                     f'Avg loss - {avg_val_loss:.4f} '
-                                     f'Avg result - {val_metrics.macro} '
-                                     f'Avg times - {val_time_metrics}')
-                    self.tb_val.log_loss(avg_val_loss, epoch)
-                    self.tb_val.log_metrics(val_metrics, step=global_step)
-                    self.tb_val.flush()
+                        val_time_metrics /= val_step + 1
+                        val_metrics = self.meter_val.compute()
+                        avg_val_loss = val_loss / max(1, len(self.val_loader))
+                        # Log results
+                        self.logger.info(f'Val for Step {epoch + 1} - '
+                                         f'Avg loss - {avg_val_loss:.4f} '
+                                         f'Avg result - {val_metrics.macro} '
+                                         f'Avg times - {val_time_metrics}')
+                        self.tb_val.log_loss(avg_val_loss, global_step)
+                        self.tb_val.log_metrics(val_metrics, step=global_step)
+                        self.tb_val.flush()
 
                     # ---- checkpoint ----
-                    torch.save(self.model.state_dict(), os.path.join(self.weights_path, f"{epoch}.pth"))
+                    checkpoint_file_path: str = os.path.join(
+                        self.weights_path,
+                        f"checkpoint_step_{global_step}.pth"
+                    )
+                    torch.save(self.model.state_dict(), checkpoint_file_path)
+                    self.logger.info(f'Saved model checkpoint at step {global_step} to {self.weights_path}')
 
 if __name__ == "__main__":
     trainer = Trainer()
