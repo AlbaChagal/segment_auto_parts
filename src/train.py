@@ -322,7 +322,19 @@ class Trainer(object):
                          f'{global_step} to {self.weights_path}')
 
     def train(self):
-
+        """
+        Main training loop
+        1. Iterate over epochs
+        2. For each epoch, iterate over training batches
+        3. Perform training step and log metrics
+        4. Periodically perform validation and log metrics
+        5. Save model checkpoints
+        6. Manage global step count
+        7. Log detailed timing metrics
+        8. Use class weights in loss computation
+        9. Ensure reproducibility via random seed management
+        :return: None. Trains the model and saves checkpoints and logs tensorboards.
+        """
         global_step: int = 0
         class_weights: torch.Tensor = torch.tensor(
             self.cfg.class_weights,
