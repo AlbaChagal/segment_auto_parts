@@ -1,54 +1,73 @@
-import argparse, torch, os
+import argparse
+import os
+import torch
 from time import perf_counter
+from typing import Tuple
 
 import numpy as np
-from PIL import Image
 import torchvision.transforms as T
-from model import SegModel
+from PIL import Image
+
 from config import Config
 from logger import Logger
+from model import SegModel
 from preprocessors import ImagePreprocessor
 
 
 class InferenceManager(object):
+    """
+    A class to manage the inference process for image segmentation.
+    """
     def __init__(self, config: Config,
                  input_dir: str,
                  output_dir: str,
                  model_path: str,
                  debug_level: str = 'info'):
-        self.input_dir = input_dir
-        self.output_dir = output_dir
-        self.model_path = model_path
+        """
+        Initialize the InferenceManager.
+        :param config: The configuration object.
+        :param input_dir: The directory containing input images.
+        :param output_dir: The directory to save output segmentation masks.
+        :param model_path: The path to the trained model weights.
+        :param debug_level: The logging level.
+        """
+        self.input_dir: str = input_dir
+        self.output_dir: str = output_dir
+        self.model_path: str = model_path
 
-        self.config = config
-        self.logger = Logger(name=self.__class__.__name__,
-                             logging_level=debug_level)
+        self.config: Config = config
+        self.logger: Logger = Logger(name=self.__class__.__name__,
+                                     logging_level=debug_level)
 
         os.makedirs(self.output_dir, exist_ok=True)
 
         # Modules
-        self.preprocessor = ImagePreprocessor(config=self.config)
-        self.model = SegModel(config=self.config)
+        self.preprocessor: ImagePreprocessor = ImagePreprocessor(config=self.config)
+        self.model: SegModel = SegModel(config=self.config)
         self.model.load_state_dict(torch.load(self.model_path, map_location="cpu"))
         self.model.eval().to(self.model.device)
 
     def run_inference(self):
+        """
+        Run inference on all images in the input directory and save the segmentation masks.
+        :return: None
+        """
         with torch.no_grad():
             for fname in os.listdir(self.input_dir):
-                t_load_data_start = perf_counter()
-                img = Image.open(os.path.join(self.input_dir, fname)).convert("RGB")
-                orig_shape = img.size
+                t_load_data_start: float = perf_counter()
+                img: Image = Image.open(os.path.join(self.input_dir, fname)).convert("RGB")
+                orig_shape: Tuple[int, int] = img.size
 
-                t_preprocess_start = perf_counter()
-                x = self.preprocessor(img).unsqueeze(0).to(self.model.device)
-                t_infer_start = perf_counter()
-                pred = self.model(x).argmax(1).squeeze(0) * 32.
-                t_post_process_start = perf_counter()
-                postprocess = T.Resize(orig_shape,
-                                       interpolation=T.InterpolationMode.NEAREST)
-                pred_full_size = postprocess(pred.unsqueeze(0).cpu())
-                pred_numpy = pred_full_size.numpy().astype(np.uint8)
-                t_main_end = perf_counter()
+                t_preprocess_start: float = perf_counter()
+                x: torch.Tensor = self.preprocessor(img).unsqueeze(0).to(self.model.device)
+                t_infer_start: float = perf_counter()
+                pred: torch.Tensor = self.model(x).argmax(1).squeeze(0) * 32.
+                t_post_process_start: float = perf_counter()
+                postprocess: T.Resize = T.Resize(orig_shape,
+                                                 interpolation=T.InterpolationMode.NEAREST)
+                pred_full_size: torch.Tensor = postprocess(pred.unsqueeze(0).cpu())
+                pred_numpy: np.ndarray = pred_full_size.numpy().astype(np.uint8)
+                t_main_end: float = perf_counter()
                 Image.fromarray(pred_numpy.squeeze()).save(os.path.join(self.output_dir, fname))
 
                 self.logger.info(f'Inference timings for {fname}: '
@@ -60,6 +79,10 @@ class InferenceManager(object):
 
 
 if __name__ == "__main__":
+    """
+    Run inference on a set of images using a trained segmentation model
+    and save the output segmentation masks.
+    """
     p = argparse.ArgumentParser()
     p.add_argument("--input", required=True)
     p.add_argument("--output", required=True)

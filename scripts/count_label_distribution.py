@@ -14,6 +14,11 @@ def iter_mask_files(root: Path, exts: List[str]):
             yield f
 
 def main():
+    """
+    Count pixel label distribution in mask images.
+    :return: Prints a report to stdout with counts and percentages per class,
+             and suggests class weights for CrossEntropyLoss.
+    """
     cfg = Config()
     mask_dir = Path(os.path.join(cfg.data_dir, 'masks'))
     classes = list(cfg.class_names_to_labels.values())

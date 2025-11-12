@@ -11,8 +11,8 @@ class Logger:
         :param logging_level: The logging level (e.g., "debug", "info", "warning", "error")
         :return: None
         """
-        self.logger = logging.getLogger(name)
-        level = getattr(logging, logging_level.upper(), logging.INFO)
+        self.logger: logging.Logger = logging.getLogger(name)
+        level: str = getattr(logging, logging_level.upper(), logging.INFO)
         self.logger.setLevel(level)
 
         fmt: logging.Formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')

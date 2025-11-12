@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from typing import Tuple, List, Dict
 
 
@@ -27,8 +28,10 @@ class Config:
     image_size: Tuple[int, int] = (512, 512)
     num_classes: int = 6
     val_percentage: float = 0.1
-    class_names_to_labels: Dict[str, int] = {"background": 0, "front_door": 32, "rear_door": 64,
-                                             "front_fender": 96, "rear_fender": 128, "door_handle": 160}
+    class_names_to_labels: Dict[str, int] = \
+        OrderedDict(
+            [("background", 0), ("front_door", 32), ("rear_door", 64),
+             ("front_fender", 96), ("rear_fender", 128), ("door_handle", 160)])
     is_augment_training_data: bool = True
 
     # Logging

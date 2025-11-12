@@ -1,15 +1,15 @@
-from typing import List, Tuple
+import os
+from typing import List, Tuple, Union
 
+from PIL import Image
 import torch
 from torch.utils.data import Dataset
-from PIL import Image
-import os
 
-from preprocessors import ImagePreprocessor, MaskPreprocessor
-from config import Config
-from logger import Logger
 from augmenter import Augmenter
+from config import Config
 from data_structures import AugmentationProbabilities
+from preprocessors import ImagePreprocessor, MaskPreprocessor
+from logger import Logger
 
 
 class CarPartsDataset(Dataset):
@@ -43,10 +43,12 @@ class CarPartsDataset(Dataset):
         return len(self.images)
 
     def __getitem__(self, idx):
-        img = Image.open(os.path.join(self.images_dir, self.images[idx]))
+        img: Union[torch.Tensor, Image] = \
+            Image.open(os.path.join(self.images_dir, self.images[idx]))
 
-        mask_name = os.path.splitext(self.images[idx])[0] + ".png"
-        mask = Image.open(os.path.join(self.masks_dir, mask_name))
+        mask_name: str = os.path.splitext(self.images[idx])[0] + ".png"
+        mask: Union[torch.Tensor, Image] = \
+            Image.open(os.path.join(self.masks_dir, mask_name))
 
         if self.is_augment:
             img, mask = self.augmenter(img, mask)
@@ -55,7 +57,7 @@ class CarPartsDataset(Dataset):
         mask = self.mask_preprocessor(mask)
 
         # remap raw pixel values -> contiguous class indices [0..5]
-        lut = torch.full((256,), -1, dtype=torch.long)
+        lut: torch.Tensor = torch.full((256,), -1, dtype=torch.long)
         for idx, val in enumerate(list(self.config.class_names_to_labels.values())):
             lut[val] = idx
         mask = lut[mask]  # [H,W] in [0..5], -1 if unknown
@@ -68,4 +70,4 @@ class CarPartsDataset(Dataset):
 
 
     def set_is_augment(self, is_augment: bool):
-        self.is_augment = is_augment
+        self.is_augment: bool = is_augment

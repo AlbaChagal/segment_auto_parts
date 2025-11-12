@@ -6,6 +6,7 @@ from torch.utils.tensorboard import SummaryWriter
 from data_structures import SegmentationMetrics
 from config import Config
 from logger import Logger
+from src.data_structures import PerClassMetrics, MacroMetrics
 
 
 class TensorBoardLogger(object):
@@ -16,24 +17,36 @@ class TensorBoardLogger(object):
       - per-class precision/recall/IoU/Dice
       - macro averages
     """
-    def __init__(self, config: Config, log_dir: str, split: str, model_id: str):
+    def __init__(self, config: Config, log_dir: str, split: str):
         self.config: Config = config
         self.logger: Logger = Logger(self.__class__.__name__,
                                      logging_level=config.tensorboard_logger_logging_level)
-        run_dir = os.path.join(log_dir, f'{split}')
+        run_dir: str = os.path.join(log_dir, f'{split}')
         os.makedirs(run_dir, exist_ok=True)
-        self.writer = SummaryWriter(run_dir)
-        self.split = split
+        self.writer: SummaryWriter = SummaryWriter(run_dir)
+        self.split: str = split
         self.logger.info(f'Initialized TensorBoardLogger writing to path: {run_dir}')
         self.class_names: List[str] = sorted(config.class_names_to_labels.keys(),
                                              key=lambda name: config.class_names_to_labels[name])
 
-    def log_loss(self, loss_value: float, step: int):
+    def log_loss(self, loss_value: float, step: int) -> None:
+        """
+        Log the loss value
+        :param loss_value: The loss value to log
+        :param step: The current training step
+        :return: None
+        """
         self.writer.add_scalar(f"_{self.split}/loss", loss_value, step)
 
-    def log_metrics(self, metrics: SegmentationMetrics, step: int):
-        per_cls = metrics.per_class
-        macro   = metrics.macro
+    def log_metrics(self, metrics: SegmentationMetrics, step: int) -> None:
+        """
+        Log segmentation metrics to TensorBoard
+        :param metrics: SegmentationMetrics object containing per-class and macro metrics
+        :param step: The current training step
+        :return: None
+        """
+        per_cls: PerClassMetrics = metrics.per_class
+        macro: MacroMetrics      = metrics.macro
 
         # macro
         for k, v in macro.__dict__.items():
@@ -53,11 +66,19 @@ class TensorBoardLogger(object):
                                    float(per_cls.dice[i]), step)
         self.logger.debug(f'log_metrics - logged metrics for step {step} on split {self.split}')
 
-    def flush(self):
+    def flush(self) -> None:
+        """
+        Flush the TensorBoard writer
+        :return: None
+        """
         self.logger.debug(f'flush - flushing TensorBoard writer for: {self.split}')
         self.writer.flush()
 
-    def close(self):
+    def close(self) -> None:
+        """
+        Close the TensorBoard writer
+        :return: None
+        """
         self.logger.debug(f'close - closing TensorBoard writer for: {self.split}')
         self.writer.close()
 
