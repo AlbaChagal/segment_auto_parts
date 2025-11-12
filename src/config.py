@@ -10,7 +10,7 @@ class Config:
     batch_size: int = 4
     val_batch_size: int = 1
     lr: float = 1e-4
-    num_epochs: int = 30
+    num_epochs: int = 50
     # Class weights are computed using median frequency
     # balancing with the script 'count_label_distribution.py'
     class_weights: List[float] = \
@@ -29,6 +29,7 @@ class Config:
     val_percentage: float = 0.1
     class_names_to_labels: Dict[str, int] = {"background": 0, "front_door": 32, "rear_door": 64,
                                              "front_fender": 96, "rear_fender": 128, "door_handle": 160}
+    is_augment_training_data: bool = True
 
     # Logging
     model_logging_level = 'info'
@@ -36,5 +37,6 @@ class Config:
     metrics_logging_level = 'info'
     tensorboard_logger_logging_level = 'info'
     dataset_logging_level = 'info'
+    augmenter_logging_level = 'debug'
     train_logging_freq: int = 20
     val_logging_freq: int = 100

@@ -1,4 +1,5 @@
 import os
+import json
 from typing import Dict, List
 from torch.utils.tensorboard import SummaryWriter
 
@@ -62,9 +63,10 @@ class TensorBoardLogger(object):
 
 
 if __name__ == "__main__":
-    from torch.utils.tensorboard import SummaryWriter
     os.makedirs("outputs/test/tensorboard/test", exist_ok=True)
     w = SummaryWriter("outputs/test/tensorboard/test")
     w.add_scalar("test/x", 1.0, 0)
     w.flush()
     w.close()
+    print(f'Wrote test TensorBoard data to outputs/test/tensorboard/test to open with '
+          f'`tensorboard --logdir outputs/test/tensorboard` just a sanity check that tensorboard works.')

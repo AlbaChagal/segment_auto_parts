@@ -38,6 +38,24 @@ class SegmentationMetrics:
     macro: MacroMetrics
 
 @dataclass
+class AugmentationProbabilities:
+    """
+    A dataclass to hold augmentation probabilities for different transformations.
+    """
+    crop: float = 0.
+    horizontal_flip: float = 0.5
+    vertical_flip: float = 0.3
+    perspective: float = 0.
+    brightness: float = 0.
+    contrast: float = 0.
+    saturation: float = 0.
+    blur: float = 0.
+    noise: float = 0.
+    noise_sigma: float = 0.
+    min_pos_frac: float = 0.
+    crop_attempts: int = 0
+
+@dataclass
 class TimeMetrics:
     """
     A dataclass to hold time metrics for various stages of training.

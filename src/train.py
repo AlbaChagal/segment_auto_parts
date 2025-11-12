@@ -1,11 +1,12 @@
 import datetime
 import os
+from random import Random
 from time import perf_counter
-from typing import List, Tuple
+from typing import Tuple
+from numpy.random import RandomState
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, random_split
-from tqdm import tqdm
+from torch.utils.data import DataLoader, Subset
 
 from config import Config
 from dataset import CarPartsDataset
@@ -20,6 +21,11 @@ class Trainer(object):
     def __init__(self):
         self.cfg: Config = Config()
         self.model_id: str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Randomness
+        self.random_state: Random = Random(self.cfg.random_seed)
+        self.np_random_state: RandomState = RandomState(self.cfg.random_seed)
+        self.torch_random_state: torch.Generator = torch.Generator().manual_seed(self.cfg.random_seed)
 
         # Paths
         self.model_path: str = os.path.join(self.cfg.outputs_folder_name, self.model_id)
@@ -51,39 +57,79 @@ class Trainer(object):
         self.meter_val: StreamingSegMetrics = StreamingSegMetrics(self.cfg)
         self.logger.info(f'initialized with model ID: {self.model_id}')
 
+    def _reset_random_states(self, seed: int):
+        self.random_state.seed(seed)
+        self.np_random_state.seed(seed)
+        self.torch_random_state.manual_seed(seed)
+        self.logger.info(f'Reset random states with seed: {seed}')
+
+    def reset_random_states(self):
+        self._reset_random_states(self.cfg.random_seed)
+
     def make_loaders(self) -> Tuple[DataLoader, DataLoader]:
-        dataset: CarPartsDataset = CarPartsDataset(
+        self.reset_random_states()
+        base_ds = CarPartsDataset(
             config=self.cfg,
             images_dir=os.path.join(self.cfg.data_dir, "images"),
             masks_dir=os.path.join(self.cfg.data_dir, "masks"),
             size=self.cfg.image_size,
-            augment=False,
+            is_augment=False,
         )
-        n_val: int = max(1, int(self.cfg.val_percentage * len(dataset)))
-        n_train: int = len(dataset) - n_val
+        n_total = len(base_ds)
+        n_val = max(1, int(self.cfg.val_percentage * n_total))
+        n_train = n_total - n_val
 
-        train_dataset: CarPartsDataset
-        val_dataset: CarPartsDataset
-        train_dataset, val_dataset = random_split(dataset,
-                                        lengths=[n_train, n_val],
-                                        generator=torch.Generator().manual_seed(self.cfg.random_seed))
+        gsplit = torch.Generator().manual_seed(self.cfg.random_seed)
+        perm = torch.randperm(n_total, generator=gsplit).tolist()
+        train_idx, val_idx = perm[:n_train], perm[n_train:]
 
-        train_loader: DataLoader = DataLoader(train_dataset,
-                                              batch_size=self.cfg.batch_size,
-                                              shuffle=True,
-                                              num_workers=4,
-                                              pin_memory=True)
+        train_ds = CarPartsDataset(
+            config=self.cfg,
+            images_dir=os.path.join(self.cfg.data_dir, "images"),
+            masks_dir=os.path.join(self.cfg.data_dir, "masks"),
+            size=self.cfg.image_size,
+            is_augment=self.cfg.is_augment_training_data
+        )
+        val_ds = CarPartsDataset(
+            config=self.cfg,
+            images_dir=os.path.join(self.cfg.data_dir, "images"),
+            masks_dir=os.path.join(self.cfg.data_dir, "masks"),
+            size=self.cfg.image_size,
+            is_augment=False
+        )
 
-        val_loader: DataLoader   = DataLoader(val_dataset,
-                                              batch_size=self.cfg.val_batch_size,
-                                              shuffle=False,
-                                              num_workers=1,
-                                              pin_memory=True)
+        train_subset = Subset(train_ds, train_idx)
+        val_subset = Subset(val_ds, val_idx)
+
+        gloader = torch.Generator().manual_seed(self.cfg.random_seed)
+
+        train_loader = DataLoader(
+            train_subset,
+            batch_size=self.cfg.batch_size,
+            shuffle=True,
+            num_workers=8,
+            pin_memory=False,
+            generator=gloader,
+            persistent_workers=False,
+            prefetch_factor=4,
+            timeout=0
+        )
+
+        val_loader = DataLoader(
+            val_subset,
+            batch_size=self.cfg.val_batch_size,
+            shuffle=False,
+            num_workers=0,
+            pin_memory=False,
+            persistent_workers=False,
+            prefetch_factor=None,
+            timeout=0
+        )
+
         self.logger.info(
-            f'Created data loaders - train samples: {n_train}, val samples: {n_val}, '
-            f'train batches: {len(train_loader)}, val batches: {len(val_loader)}'
+            f"Created data loaders - train samples: {n_train}, val samples: {n_val}, "
+            f"train batches: {len(train_loader)}, val batches: {len(val_loader)}"
         )
-
         return train_loader, val_loader
 
     def training_step(self,
