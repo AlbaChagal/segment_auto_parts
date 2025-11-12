@@ -1,12 +1,11 @@
 import os
-import json
-from typing import Dict, List
+from typing import List
 from torch.utils.tensorboard import SummaryWriter
 
 from data_structures import SegmentationMetrics
 from config import Config
 from logger import Logger
-from src.data_structures import PerClassMetrics, MacroMetrics
+from data_structures import PerClassMetrics, MacroMetrics
 
 
 class TensorBoardLogger(object):

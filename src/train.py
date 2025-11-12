@@ -138,11 +138,11 @@ class Trainer(object):
             train_subset,
             batch_size=self.cfg.batch_size,
             shuffle=True,
-            num_workers=8,
+            num_workers=0,
             pin_memory=False,
             generator=gloader,
             persistent_workers=False,
-            prefetch_factor=4,
+            prefetch_factor=None,
             timeout=0
         )
 
