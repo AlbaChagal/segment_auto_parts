@@ -25,8 +25,7 @@ class TensorBoardLogger(object):
         self.writer: SummaryWriter = SummaryWriter(run_dir)
         self.split: str = split
         self.logger.info(f'Initialized TensorBoardLogger writing to path: {run_dir}')
-        self.class_names: List[str] = sorted(config.class_names_to_labels.keys(),
-                                             key=lambda name: config.class_names_to_labels[name])
+        self.class_names: List[str] = list(config.class_names_to_labels.keys())
 
     def log_loss(self, loss_value: float, step: int) -> None:
         """

@@ -34,6 +34,7 @@ class Config:
     is_augment_training_data: bool = True
 
     # Logging
+    preprocessor_logging_level: str = 'info'
     model_logging_level: str = 'info'
     trainer_logging_level: str = 'info'
     metrics_logging_level: str = 'info'

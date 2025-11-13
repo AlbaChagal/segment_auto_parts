@@ -63,10 +63,14 @@ class InferenceManager(object):
                 t_infer_start: float = perf_counter()
                 pred: torch.Tensor = self.model(x).argmax(1).squeeze(0) * 32.
                 t_post_process_start: float = perf_counter()
-                postprocess: T.Resize = T.Resize(orig_shape,
+                postprocess: T.Resize = T.Resize(orig_shape[::-1],
                                                  interpolation=T.InterpolationMode.NEAREST)
+
                 pred_full_size: torch.Tensor = postprocess(pred.unsqueeze(0).cpu())
                 pred_numpy: np.ndarray = pred_full_size.numpy().astype(np.uint8)
+                final_pred: Image.Image = Image.fromarray(pred_numpy.squeeze())
+                assert final_pred.size == orig_shape, \
+                    f'Expected final prediction size {orig_shape}, got {final_pred.size}'
                 t_main_end: float = perf_counter()
                 Image.fromarray(pred_numpy.squeeze()).save(os.path.join(self.output_dir, fname))
 

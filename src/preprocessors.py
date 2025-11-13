@@ -3,6 +3,7 @@ import torch.nn
 import torchvision.transforms as T
 
 from config import Config
+from logger import Logger
 
 
 class ImagePreprocessor(torch.nn.Module):
@@ -23,6 +24,8 @@ class ImagePreprocessor(torch.nn.Module):
         """
         super().__init__()
         self.config: Config = config
+        self.logger: Logger = Logger(self.__class__.__name__,
+                                     logging_level=config.preprocessor_logging_level)
         self.resize: T.Resize = T.Resize(self.config.image_size)
         self.to_tensor: T.ToTensor = T.ToTensor()
         # Original ImageNet normalization values
@@ -43,7 +46,9 @@ class ImagePreprocessor(torch.nn.Module):
         :param img: Input PIL Image.
         :return: Preprocessed image tensor.
         """
+        self.logger.debug(f'forward - preprocessing image with size {img.size}')
         img: torch.Tensor = self.transform(img)
+        self.logger.debug(f'forward - preprocessed image tensor shape {img.shape}')
         return img
 
 class MaskPreprocessor(torch.nn.Module):
@@ -64,6 +69,8 @@ class MaskPreprocessor(torch.nn.Module):
         """
         super().__init__()
         self.config: Config = config
+        self.logger: Logger = Logger(self.__class__.__name__,
+                                     logging_level=config.preprocessor_logging_level)
         self.resize: T.Resize = T.Resize(self.config.image_size,
                                          interpolation=T.InterpolationMode.NEAREST)
         self.to_tensor: T.PILToTensor = T.PILToTensor()
@@ -82,5 +89,7 @@ class MaskPreprocessor(torch.nn.Module):
         :param mask: Input PIL Image.
         :return: Preprocessed mask tensor.
         """
+        self.logger.debug(f'forward - preprocessing mask with size {mask.size}')
         mask: torch.Tensor = self.transform(mask).squeeze(0).long()
+        self.logger.debug(f'forward - preprocessed mask tensor shape {mask.shape}')
         return mask
