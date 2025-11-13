@@ -136,7 +136,7 @@ if __name__ == "__main__":
     p.add_argument("--input", required=True)
     p.add_argument("--output", required=True)
     args = p.parse_args()
-    model_path_main = '/Users/shaharheyman/PycharmProjects/auto1_segmentation/outputs/20251113_000144/weights/checkpoint_step_4600.pth'
+    model_path_main = './checkpoint.pth'
     config = Config()
     inference_manager = InferenceManager(config=config,
                                          input_dir=args.input,
