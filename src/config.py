@@ -8,15 +8,14 @@ class Config:
     random_seed: int = 42
 
     # Training params
-    batch_size: int = 4
+    batch_size: int = 8
     val_batch_size: int = 1
-    lr: float = 1e-4
+    lr: float = 5e-5
     num_epochs: int = 50
     # Class weights are computed using median frequency
     # balancing with the script 'count_label_distribution.py'
     class_weights: List[float] = \
         [0.130084, 0.722525, 0.835331, 3.642700, 1.245533, 21.490470]
-
 
     # Path params
     outputs_folder_name: str = "outputs"
@@ -35,11 +34,11 @@ class Config:
     is_augment_training_data: bool = True
 
     # Logging
-    model_logging_level = 'info'
-    trainer_logging_level = 'info'
-    metrics_logging_level = 'info'
-    tensorboard_logger_logging_level = 'info'
-    dataset_logging_level = 'info'
-    augmenter_logging_level = 'debug'
+    model_logging_level: str = 'info'
+    trainer_logging_level: str = 'info'
+    metrics_logging_level: str = 'info'
+    tensorboard_logger_logging_level: str = 'info'
+    dataset_logging_level: str = 'info'
+    augmenter_logging_level: str = 'info'
     train_logging_freq: int = 20
     val_logging_freq: int = 100
