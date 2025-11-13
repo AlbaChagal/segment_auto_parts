@@ -2,7 +2,7 @@ import argparse
 import os
 import torch
 from time import perf_counter
-from typing import Tuple
+from typing import Tuple, List
 
 import numpy as np
 import torchvision.transforms as T
@@ -38,6 +38,7 @@ class InferenceManager(object):
         self.config: Config = config
         self.logger: Logger = Logger(name=self.__class__.__name__,
                                      logging_level=debug_level)
+        self.is_create_gifs: bool = debug_level == 'debug'
 
         os.makedirs(self.output_dir, exist_ok=True)
 
@@ -47,21 +48,50 @@ class InferenceManager(object):
         self.model.load_state_dict(torch.load(self.model_path, map_location="cpu"))
         self.model.eval().to(self.model.device)
 
+    def _create_alternating_gif(self,
+                                img: Image.Image,
+                                mask: Image.Image,
+                                save_path: str,
+                                duration: int = 1000):
+        """
+        Create an alternating GIF between the original image and the segmentation mask.
+        :param img: The original image.
+        :param mask: The segmentation mask.
+        :param save_path: The path to save the GIF.
+        :param duration: Duration of each frame in milliseconds.
+        :return: None
+        """
+        frames: List[Image.Image] = [img, mask.convert("RGB")]
+        frames[1].putalpha(128)  # Make mask semi-transparent
+        frames = [frames[0], frames[1], frames[0]]  # Alternate frames
+        frames[0].save(save_path,
+                       save_all=True,
+                       append_images=frames[1:]*20,  # Repeat to make longer GIF
+                       duration=duration)
+        self.logger.info(f'Saved alternating GIF to {save_path}')
+
     def run_inference(self):
         """
         Run inference on all images in the input directory and save the segmentation masks.
         :return: None
         """
+        times = []
+        test_files: List[str] = os.listdir(self.input_dir)
+        test_files = [test_files[0]] + test_files  # Duplicate the first file for warm-up
+        self.logger.info(f'Running inference on {len(test_files)} images from {self.input_dir}')
         with torch.no_grad():
-            for fname in os.listdir(self.input_dir):
+            for i, fname in enumerate(os.listdir(self.input_dir)):
+
                 t_load_data_start: float = perf_counter()
                 img: Image = Image.open(os.path.join(self.input_dir, fname)).convert("RGB")
                 orig_shape: Tuple[int, int] = img.size
 
                 t_preprocess_start: float = perf_counter()
                 x: torch.Tensor = self.preprocessor(img).unsqueeze(0).to(self.model.device)
+
                 t_infer_start: float = perf_counter()
-                pred: torch.Tensor = self.model(x).argmax(1).squeeze(0) * 32.
+                pred: torch.Tensor = self.model(x).argmax(1).squeeze(0) * 32.  # * 32 to match labels
+
                 t_post_process_start: float = perf_counter()
                 postprocess: T.Resize = T.Resize(orig_shape[::-1],
                                                  interpolation=T.InterpolationMode.NEAREST)
@@ -72,7 +102,19 @@ class InferenceManager(object):
                 assert final_pred.size == orig_shape, \
                     f'Expected final prediction size {orig_shape}, got {final_pred.size}'
                 t_main_end: float = perf_counter()
-                Image.fromarray(pred_numpy.squeeze()).save(os.path.join(self.output_dir, fname))
+
+                if i == 0:
+                    self.logger.info(f'Warm-up inference completed for {fname}, skipping time logging.')
+                    continue
+
+                times.append(t_main_end - t_load_data_start)
+
+                # Save prediction mask
+                final_pred.save(os.path.join(self.output_dir, fname))
+                if self.is_create_gifs:
+                    gif_path: str = os.path.join(self.output_dir,
+                                                 f'{os.path.splitext(fname)[0]}_alt.gif')
+                    self._create_alternating_gif(img, final_pred, gif_path)
 
                 self.logger.info(f'Inference timings for {fname}: '
                                  f'load_data: {t_preprocess_start - t_load_data_start:.4f}, '
@@ -80,6 +122,9 @@ class InferenceManager(object):
                                  f'inference: {t_post_process_start - t_infer_start:.4f}s, '
                                  f'postprocess: {t_main_end - t_post_process_start:.4f}s, '
                                  f'total: {t_main_end - t_load_data_start:.4f}s')
+        # Exclude first time (warm-up)
+        avg_time: float = sum(times) / len(times) if times else 0.0
+        self.logger.info(f'Average inference time per image: {avg_time:.4f}s')
 
 
 if __name__ == "__main__":
@@ -91,7 +136,7 @@ if __name__ == "__main__":
     p.add_argument("--input", required=True)
     p.add_argument("--output", required=True)
     args = p.parse_args()
-    model_path_main = '/Users/shaharheyman/PycharmProjects/auto1_segmentation/outputs/20251111_190327/'
+    model_path_main = '/Users/shaharheyman/PycharmProjects/auto1_segmentation/outputs/20251113_000144/weights/checkpoint_step_4600.pth'
     config = Config()
     inference_manager = InferenceManager(config=config,
                                          input_dir=args.input,
