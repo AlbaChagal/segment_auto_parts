@@ -114,6 +114,10 @@ class Trainer(object):
         val_idx: torch.Tensor
         train_idx, val_idx = perm[:n_train], perm[n_train:]
 
+        assert set(train_idx).isdisjoint(set(val_idx)), \
+            f"Train and validation indices overlap! Train idx: {train_idx}, Val idx: {val_idx} " \
+            f"overlap: {set(train_idx).intersection(set(val_idx))}"
+
         train_ds: CarPartsDataset = CarPartsDataset(
             config=self.cfg,
             images_dir=os.path.join(self.cfg.data_dir, "images"),
@@ -273,13 +277,13 @@ class Trainer(object):
         self.tb_train.log_loss(loss_value, global_step)
         if global_step % self.cfg.train_logging_freq == 0:
             self.logger.info(f'Logging training metrics at step {global_step}')
-            train_time_metrics /= (step_in_epoch + 1)
+            train_time_metrics /= self.cfg.train_logging_freq
             train_metrics: SegmentationMetrics = self.meter_train.compute()
 
             self.logger.info(
                 f'Training step {global_step} - '
-                f'Avg loss (s) - {running_loss / max(1, len(self.train_loader)):.4f} '
-                f'Avg result (s) - {train_metrics.macro} '
+                f'Avg loss - {running_loss / max(1, len(self.train_loader)):.4f} '
+                f'Avg result - {train_metrics.macro} '
                 f'Avg times (s) - {train_time_metrics}'
             )
 

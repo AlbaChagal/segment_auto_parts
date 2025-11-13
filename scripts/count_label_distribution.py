@@ -5,12 +5,13 @@ from typing import List
 import numpy as np
 from PIL import Image
 
-from config import Config
+from src.config import Config
 
 
-def iter_mask_files(root: Path, exts: List[str]):
+def iter_mask_files(root: Path,
+                    extensions: List[str]):
     for f in sorted(root.iterdir()):
-        if f.is_file() and f.suffix.lower() in exts:
+        if f.is_file() and f.suffix.lower() in extensions:
             yield f
 
 def main():
