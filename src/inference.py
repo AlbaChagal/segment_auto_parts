@@ -7,6 +7,7 @@ from typing import Tuple, List
 import numpy as np
 import torchvision.transforms as T
 from PIL import Image
+import matplotlib.pyplot as plt
 
 from config import Config
 from logger import Logger
@@ -18,18 +19,19 @@ class InferenceManager(object):
     """
     A class to manage the inference process for image segmentation.
     """
-    def __init__(self, config: Config,
+    def __init__(self,
+                 config: Config,
                  input_dir: str,
                  output_dir: str,
                  model_path: str,
-                 debug_level: str = 'info'):
+                 logging_level: str = 'info'):
         """
         Initialize the InferenceManager.
         :param config: The configuration object.
         :param input_dir: The directory containing input images.
         :param output_dir: The directory to save output segmentation masks.
         :param model_path: The path to the trained model weights.
-        :param debug_level: The logging level.
+        :param logging_level: The logging level.
         """
         self.input_dir: str = input_dir
         self.output_dir: str = output_dir
@@ -37,8 +39,8 @@ class InferenceManager(object):
 
         self.config: Config = config
         self.logger: Logger = Logger(name=self.__class__.__name__,
-                                     logging_level=debug_level)
-        self.is_create_gifs: bool = debug_level == 'debug'
+                                     logging_level=logging_level)
+        self.is_create_gifs: bool = logging_level == 'debug'
 
         os.makedirs(self.output_dir, exist_ok=True)
 
@@ -70,6 +72,34 @@ class InferenceManager(object):
                        duration=duration)
         self.logger.info(f'Saved alternating GIF to {save_path}')
 
+    def _plot_legend(self) -> None:
+        """
+        Create a legend to understand visualization better
+        :return: None
+        """
+        plt.figure()
+        legend: np.ndarray = np.zeros(shape=[512, 512])
+        height_factor: int = legend.shape[0] // len(self.config.class_names_to_labels)
+        w_center: int = legend.shape[0] // 2
+        text_and_center: List[Tuple[str, int]] = []
+        h_min: int
+        h_max: int
+        h_center: int
+        for i, (name, value) in enumerate(self.config.class_names_to_labels.items()):
+            h_min = i * height_factor
+            h_max = (i + 1) * height_factor
+            h_center = h_min + (height_factor // 2)
+            legend[h_min: h_max, :] = value
+            text_and_center.append((name, h_center))
+
+        plt.imshow(legend, vmin=0, vmax=255, cmap='gray')
+        color: Tuple[str, int] = ('C3', 1)  # Red - visible on all grayscale backgrounds
+        for text, center in text_and_center:
+            plt.text(x=w_center, y=center, s=text, color=color, horizontalalignment='center')
+        path: str = f'{self.output_dir}/../legend.jpg'
+        plt.savefig(path)
+        self.logger.debug(f'_plot_legend - saved legend plot to {path}')
+
     def run_inference(self):
         """
         Run inference on all images in the input directory and save the segmentation masks.
@@ -78,6 +108,7 @@ class InferenceManager(object):
         times = []
         test_files: List[str] = os.listdir(self.input_dir)
         test_files = [test_files[0]] + test_files  # Duplicate the first file for warm-up
+
         self.logger.info(f'Running inference on {len(test_files)} images from {self.input_dir}')
         with torch.no_grad():
             for i, fname in enumerate(os.listdir(self.input_dir)):
@@ -115,6 +146,7 @@ class InferenceManager(object):
                     gif_path: str = os.path.join(self.output_dir,
                                                  f'{os.path.splitext(fname)[0]}_alt.gif')
                     self._create_alternating_gif(img, final_pred, gif_path)
+                    self._plot_legend()
 
                 self.logger.info(f'Inference timings for {fname}: '
                                  f'load_data: {t_preprocess_start - t_load_data_start:.4f}, '
@@ -136,10 +168,13 @@ if __name__ == "__main__":
     p.add_argument("--input", required=True)
     p.add_argument("--output", required=True)
     args = p.parse_args()
-    model_path_main = './checkpoint.pth'
+
+    logging_level = 'info'
     config = Config()
+    model_path_main = config.final_checkpoint_path
     inference_manager = InferenceManager(config=config,
                                          input_dir=args.input,
                                          output_dir=args.output,
-                                         model_path=model_path_main)
+                                         model_path=model_path_main,
+                                         logging_level=logging_level)
     inference_manager.run_inference()
