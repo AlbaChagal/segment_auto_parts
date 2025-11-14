@@ -22,6 +22,7 @@ class Config:
     weight_folder_name: str = "weights"
     tensorboard_folder_name: str = "tensorboard"
     data_dir: str = "data/train/"
+    final_checkpoint_path: str = 'checkpoint.pth'
 
     # Data params
     image_size: Tuple[int, int] = (512, 512)

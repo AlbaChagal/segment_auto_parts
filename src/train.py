@@ -74,8 +74,8 @@ class Trainer(object):
         self.train_loader, self.val_loader = self._make_loaders()
         self.model: SegModel = SegModel(self.cfg)
         self.model.to(self.model.device)
-        self.opt: torch.optim.AdamW = torch.optim.AdamW(self.model.parameters(),
-                                                        lr=self.cfg.lr)
+        self.optimizer: torch.optim.AdamW = torch.optim.AdamW(self.model.parameters(),
+                                                              lr=self.cfg.lr)
         self.meter_train: StreamingSegMetrics = StreamingSegMetrics(self.cfg)
         self.meter_val: StreamingSegMetrics = StreamingSegMetrics(self.cfg)
         self.logger.info(f'initialized with model ID: {self.model_id}')
@@ -109,7 +109,7 @@ class Trainer(object):
         n_train: int = n_total - n_val
 
         gsplit: torch.Generator = torch.Generator().manual_seed(self.cfg.random_seed)
-        perm: torch.Tensor = torch.randperm(n_total, generator=gsplit).tolist()
+        perm: torch.Tensor = torch.randperm(n_total, generator=gsplit)
         train_idx: torch.Tensor
         val_idx: torch.Tensor
         train_idx, val_idx = perm[:n_train], perm[n_train:]
@@ -186,7 +186,7 @@ class Trainer(object):
         imgs: torch.Tensor = imgs.to(self.model.device, non_blocking=True)
         masks: torch.Tensor = masks.to(self.model.device, non_blocking=True)
         t_fwd_start: float = perf_counter()
-        self.opt.zero_grad(set_to_none=True)
+        self.optimizer.zero_grad(set_to_none=True)
         logits: torch.Tensor = self.model(imgs)
         t_loss_start: float = perf_counter()
         loss: torch.Tensor = F.cross_entropy(
@@ -198,7 +198,7 @@ class Trainer(object):
         t_bwd_start: float = perf_counter()
         loss.backward()
         t_step_start: float = perf_counter()
-        self.opt.step()
+        self.optimizer.step()
         running_loss += float(loss.item())
         t_metrics_start = perf_counter()
         self.meter_train.update(logits.detach(), masks.detach())
