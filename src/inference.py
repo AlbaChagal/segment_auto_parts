@@ -50,6 +50,16 @@ class InferenceManager(object):
         self.model.load_state_dict(torch.load(self.model_path, map_location="cpu"))
         self.model.eval().to(self.model.device)
 
+    @staticmethod
+    def _change_name_to_png(filename: str) -> str:
+        """
+        Change the file extension of the given filename to .png
+        :param filename: The original filename.
+        :return: The filename with .png extension.
+        """
+        base, _ = os.path.splitext(filename)
+        return f'{base}.png'
+
     def _create_alternating_gif(self,
                                 img: Image.Image,
                                 mask: Image.Image,
@@ -141,7 +151,8 @@ class InferenceManager(object):
                 times.append(t_main_end - t_load_data_start)
 
                 # Save prediction mask
-                final_pred.save(os.path.join(self.output_dir, fname))
+                fname_png: str = self._change_name_to_png(fname)
+                final_pred.save(os.path.join(self.output_dir, fname_png))
                 if self.is_create_gifs:
                     gif_path: str = os.path.join(self.output_dir,
                                                  f'{os.path.splitext(fname)[0]}_alt.gif')

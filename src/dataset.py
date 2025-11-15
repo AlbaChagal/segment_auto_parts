@@ -71,3 +71,22 @@ class CarPartsDataset(Dataset):
 
     def set_is_augment(self, is_augment: bool):
         self.is_augment: bool = is_augment
+
+if __name__ == "__main__":
+    from torch.utils.data import DataLoader
+    from config import Config
+
+    config = Config()
+    dataset = CarPartsDataset(
+        config=config,
+        images_dir='data/train/images/',
+        masks_dir='data/train/masks/',
+        size=(512, 512),
+        is_augment=True
+    )
+    dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
+    print(f'Dataset size: {len(dataset)}')
+    for imgs, masks in dataloader:
+        print(f'Batch of images shape: {imgs.shape}')
+        print(f'Batch of masks shape: {masks.shape}')
+        break

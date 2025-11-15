@@ -54,3 +54,15 @@ class SegModel(nn.Module):
         :return: Output tensor
         """
         return self.model(x)["out"]
+
+
+if __name__ == '__main__':
+    config: Config = Config()
+    model: SegModel = SegModel(config=config)
+    dummy_input: torch.Tensor = torch.randn((2, 3, config.image_size[0], config.image_size[1]))
+    output: torch.Tensor = model(dummy_input)
+    print(f'Dummy input shape: {dummy_input.shape}')
+    print(f'Output shape: {output.shape}')
+
+    print("Model Summary:")
+    print(model.model.backbone)

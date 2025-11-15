@@ -34,7 +34,7 @@ pip install -r requirements.txt
 
 ### **Command**
 ```bash
-python3 train.py
+python3 src/train.py
 ```
 
 All training‑related hyperparameters (learning rate, batch size, class_weights, etc.) can be configured in `config.py`.
@@ -56,11 +56,11 @@ The selected configurations (in bold) are the best observed under these constrai
 
 ### **Command**
 ```bash
-python3 inference.py --input path/to/test_images --output path/to/predictions
+python3 src/inference.py --input path/to/test_images --output path/to/predictions
 ```
 
 The script:
-- Loads the selected checkpoint from `config.best_checkpoint.pth`
+- Loads the selected checkpoint from `checkpoint.pth`
 - Performs preprocessing + normalization
 - Runs inference under `torch.no_grad()`
 - Saves masks as **single‑channel PNGs** with the exact class values `{0, 32, 64, 96, 128, 160}`
@@ -111,20 +111,19 @@ My **validation metrics** at step 4,600 (best validation IoU) are:
 - **Dice** ≈ 0.842  
 
 - **Average Inference Time (on test images)** = ~0.25 seconds (not including first warmup pass)  
-- **Model Size** = ~160 MB (saved as `best_model.pth`)
+- **Model Size** = ~160 MB (saved as `checkpoint.pth`)
 The inference time was recorder on an Apple M4 (16Gb) chip and should be faster with an NVIDIA RTX 5090 
 
 The selected checkpoint was chosen according to **mean IoU**.  
 However, depending on the *business objective*, another metric may become more important
 
 ### Examples of metric vs. business priority:
-- **Recall‑oriented** if missing a damaged car part has high cost.
+- **Mean Dice** if overall overlap quality is prioritized.
+- **Recall‑oriented** if missing a damaged car part has a high cost.
 - **Precision‑oriented** if false positives trigger expensive manual review.
 - **Per‑class IoU** if some classes (e.g., door handles) are more critical than others.
-
-It is important to distinguish:
-- **ML metrics**: IoU, Dice, Recall, Precision  
-- **Business metrics**: cost of errors, operational load, downstream task needs  
+- **Hard metrics** such as % of objects detected above a certain pixel threshold, if there is such a 
+threshold that sets the business needs. 
 
 Depending on the business requirements, the ranking of checkpoints may differ.
 
@@ -146,9 +145,9 @@ Logged for each of the 6 classes:
 - IoU  
 - Dice  
 - Recall  
-- Precision  
+- Precision
 
-**Purpose**
+### **Purpose**
 
 1. Debugging segmentation failures (e.g., small objects collapsing).  
 2. Ensuring the final checkpoint performs well for *all* classes.  
@@ -158,6 +157,8 @@ To launch TensorBoard:
 ```bash
 tensorboard --logdir outputs/
 ```
+While it is running:
+Navigate to `http://localhost:6006` in your browser.
 
 ---
 
@@ -170,7 +171,7 @@ This repository includes a helper script:
 It scans all training masks and produces:
 - Pixel count per class  
 - Class distribution histogram  
-- Automatically computed **inverse‑frequency class weights**
+- Automatically computed **inverse‑frequency and mean-frequency class weights**
 
 These weights were used for:
 - **Weighted Cross‑Entropy Loss**
@@ -188,7 +189,7 @@ Output includes:
 
 Example:
 ```python
-class_weights = [1.0, 3.2, 2.7, 4.5, 4.1, 6.8]
+class_weights = [0.130084, 0.722525, 0.835331, 3.642700, 1.245533, 21.490470]
 ```
 
 You can manually paste the resulting weights into `config.py`.
@@ -198,30 +199,55 @@ You can manually paste the resulting weights into `config.py`.
 ## 8. Project Structure
 
 ```
-.
-├── train.py
-├── inference.py
-├── datasets/
-│   ├── images/
-│   ├── masks/
-│   └── test_images/
-├── models/
-│   └── deeplab.py
-├── utils/
-│   ├── metrics.py
-│   ├── transforms.py
-│   └── helpers.py
-├── outputs/
-│   └── ... experiments + tensorboard logs ...
-├── count_label_distribution.py
-└── requirements.txt
+auto1_car_part_segmentation/
+├── .venv
+├── data/
+    ├── test/
+        ├── images/
+            ├── 000.jpg
+            ├── 001.jpg
+            ├── ...
+    ├── train/
+       ├── images/ 
+           ├── 000.jpg
+           ├── 001.jpg
+           ├── ...
+       ├── masks/
+           ├── 000.png
+           ├── 001.png
+           ├── ...
+├── predictions/
+    ├── 000.png
+    ├── 001.png
+    ├── ...
+├── src/
+    ├── augmenter.py
+    ├── config.py
+    ├── count_label_distribution.py
+    ├── data_structures.py
+    ├── dataset.py
+    ├── inference.py
+    ├── logger.py
+    ├── metrics.py
+    ├── model.py
+    ├── metrics.py
+    ├── preprocessors.py
+    ├── tensorboard_logger.py
+    ├── train.py
+├── checkpoint.pth
+├── requirements.txt
+├── README.md
+
+
+
 ```
 
 ---
 
 ## 9. Reproducibility
 
-- Deterministic seeds  
+- Deterministic seeds - Complete determinism was not tested as it was not required for the assignment, 
+but seeds are set for all relevant libraries.
 - Fixed versions in `requirements.txt`  
 - All training parameters documented in `config.py`  
 - Single‑command inference and training  
@@ -232,21 +258,32 @@ You can manually paste the resulting weights into `config.py`.
 
 The project was created and tested on a MacBook Pro with an Apple M4 chip with 16Gb unified memory
 Please NOTICE that I did not have an Nvidia GPU to test this on, therefore it has not been tested on GPU, 
-but should work seamlessly in theory. The project has been tested on CPU, and works, 
+but should work seamlessly in theory. The project has been tested on CPU and it works, 
 but of course this slows the entire process down by a large margin.
 
 ---
 
-## 11. Future Work
-If more time were available, I would explore several improvements to enhance model performance, robustness, and production readiness:
+## 11. Unit Tests
+Each module (except for `Config`) includes basic unit tests that can be run with:
+```bash
+python3 src/<module_name>.py
+```
+The tests themselves are located at the bottom of each module file, under the
+`if __name__ == "__main__":` clause.
+
+## 12. Future Work
+If more time were available, I would explore several improvements to enhance model performance, robustness and production readiness:
 
 ### **Model & Training Improvements**
 - Run a more systematic hyperparameter search (learning-rate schedules, optimizers, batch sizes, regularization).
 - Test alternative architectures such as DeepLabV3+, HRNet, or SegFormer.
 - Improve handling of small objects using higher-resolution training and losses like Focal or Lovász-Softmax.
+- Add hard metrics (for example how many door handles did we segment at least a th% of their pixels) 
+to get a better picture of performance, as well as align to business metrics depending on the details of the business task
 
 ### **Data & Augmentation Enhancements**
-- Add stronger augmentations (color jitter, noise, compression, perspective transforms).
+- Use stronger augmentations (s.a. color jitter, noise, compression, perspective transforms) - 
+already implemented but seems to degrade results, it needs some more testing and param tuning.
 - Improve sampling by oversampling rare classes or mining patches rich in small objects like door handles.
 
 ### **Evaluation & Error Analysis**
@@ -260,11 +297,9 @@ If more time were available, I would explore several improvements to enhance mod
 ## 12. Final Notes
 
 This repository satisfies all requirements from the assignment, including:
-- Segmentation model under 180MB
-- Inference under 1s per image
+- Model file under 180MB
+- Inference under 1s per image (test on Apple M4)
 - CLI inference tool
 - Full documentation
 - Justified design choices
-- Class weighting and analytics tools
-- TensorBoard experiment tracking
 

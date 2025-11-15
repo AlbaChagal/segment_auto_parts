@@ -93,3 +93,18 @@ class MaskPreprocessor(torch.nn.Module):
         mask: torch.Tensor = self.transform(mask).squeeze(0).long()
         self.logger.debug(f'forward - preprocessed mask tensor shape {mask.shape}')
         return mask
+
+
+if __name__ == '__main__':
+    config: Config = Config()
+    img_preprocessor: ImagePreprocessor = ImagePreprocessor(config=config)
+    mask_preprocessor: MaskPreprocessor = MaskPreprocessor(config=config)
+
+    dummy_image: Image = Image.new('RGB', (500, 500))
+    dummy_mask: Image = Image.new('L', (500, 500))
+
+    preprocessed_img: torch.Tensor = img_preprocessor(dummy_image)
+    preprocessed_mask: torch.Tensor = mask_preprocessor(dummy_mask)
+
+    print(f'Preprocessed image shape: {preprocessed_img.shape}')
+    print(f'Preprocessed mask shape: {preprocessed_mask.shape}')

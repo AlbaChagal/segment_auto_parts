@@ -94,3 +94,60 @@ class TimeMetrics:
         return f'total: {self.total: .4f}, data: {self.data:.4f}, ' \
         f'forward: {self.forward:.4f}, step: {self.optimizer_step:.4f}, ' \
         f'batch: {self.batch:.4f}, metrics: {self.metrics:.4f}'
+
+
+if __name__ == "__main__":
+    # Example usage of the dataclasses
+    per_class_metrics = PerClassMetrics(
+        precision=[0.9, 0.8, 0.85],
+        recall=[0.88, 0.75, 0.9],
+        iou=[0.8, 0.7, 0.75],
+        dice=[0.85, 0.78, 0.82],
+        support=[100, 150, 120]
+    )
+
+    macro_metrics = MacroMetrics(
+        precision=0.85,
+        recall=0.81,
+        iou=0.75,
+        dice=0.82
+    )
+
+    segmentation_metrics = SegmentationMetrics(
+        per_class=per_class_metrics,
+        macro=macro_metrics
+    )
+
+    print("Segmentation Metrics:")
+    print(segmentation_metrics.macro)
+    for i, class_name in enumerate(['class_1', 'class_2', 'class_3']):
+        print(f"{class_name} - Precision: {segmentation_metrics.per_class.precision[i]:.4f}, "
+              f"Recall: {segmentation_metrics.per_class.recall[i]:.4f}, "
+              f"IoU: {segmentation_metrics.per_class.iou[i]:.4f}, "
+              f"Dice: {segmentation_metrics.per_class.dice[i]:.4f}, "
+              f"Support: {segmentation_metrics.per_class.support[i]}")
+    aug_probs = AugmentationProbabilities(
+        crop=0.2,
+        horizontal_flip=0.5,
+        vertical_flip=0.3
+    )
+    print("\nAugmentation Probabilities:")
+    print(aug_probs)
+    time_metrics = TimeMetrics(
+        total=1.234,
+        data=0.123,
+        forward=0.456,
+        backward=0.234,
+        optimizer_step=0.098,
+        batch=1.234,
+        metrics=0.045
+    )
+    print("\nTime Metrics:")
+    print(time_metrics)
+
+    avg_time_metrics = time_metrics / 2
+    print("\nAverage Time Metrics (divided by 2):")
+    print(avg_time_metrics)
+
+    print("\nAdded Time Metrics (time_metrics + time_metrics):")
+    print(time_metrics + time_metrics)

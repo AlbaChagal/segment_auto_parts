@@ -5,7 +5,7 @@ from typing import List
 import numpy as np
 from PIL import Image
 
-from src.config import Config
+from config import Config
 
 
 def iter_mask_files(root: Path,

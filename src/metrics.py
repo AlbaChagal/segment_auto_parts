@@ -105,3 +105,19 @@ class StreamingSegMetrics:
             macro=macro,
         )
         return seg_metrics
+
+
+if __name__ == "__main__":
+    # Simple test of StreamingSegMetrics
+    config = Config()
+    metrics = StreamingSegMetrics(config)
+
+    # Simulate some predictions and targets
+    preds = torch.tensor([[[0, 1], [1, 0]], [[1, 0], [0, 1]]])  # [N,H,W]
+    targets = torch.tensor([[[0, 1], [0, 0]], [[1, 1], [0, 1]]])  # [N,H,W]
+
+    metrics.update(preds, targets)
+    seg_metrics = metrics.compute()
+
+    print("Per-class precision:", seg_metrics.per_class.precision)
+    print("Per-class recall:", seg_metrics.per_class.recall)

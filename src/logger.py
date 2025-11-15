@@ -53,3 +53,17 @@ class Logger:
         :return: None
         """
         self.logger.error(f'{self.name} - {msg}')
+
+
+if __name__ == "__main__":
+    log: Logger = Logger("TestLogger", logging_level="debug")
+    log.info("This is an info message.")
+    log.debug("This is a debug message.")
+    log.warning("This is a warning message.")
+    log.error("This is an error message.")
+
+    log.error('======================================================================')
+
+    logger_info = Logger("InfoLogger", logging_level="info")
+    logger_info.info("Info level logger - info message.")
+    logger_info.debug("Info level logger - debug message (should not appear).")
